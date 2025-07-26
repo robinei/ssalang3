@@ -1,0 +1,10 @@
+[workspace]
+resolver = "3"
+members = [
+  "main",
+  "macros",
+  "common",
+  "lexer",
+  "ast",
+  "ir",
+]
