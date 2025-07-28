@@ -35,13 +35,16 @@ pub fn ast_node_attr(args: TokenStream, input: TokenStream) -> TokenStream {
     let struct_name = &input.ident;
     let node_type = &args.node_type;
 
-    let (array_impl, element_type) = if let Some(ref elem_type) = args.array_type {
+    let (length_type, element_type) = if let Some(ref elem_type) = args.array_type {
         (
-            quote! { impl ArrayNode for #struct_name {} },
+            quote! { type LengthType = u32; },
             quote! { type ElementType = #elem_type; },
         )
     } else {
-        (quote! {}, quote! { type ElementType = (); })
+        (
+            quote! { type LengthType = (); },
+            quote! { type ElementType = (); },
+        )
     };
 
     quote! {
@@ -51,10 +54,9 @@ pub fn ast_node_attr(args: TokenStream, input: TokenStream) -> TokenStream {
 
         impl AstNode for #struct_name {
             const NODE_TYPE: NodeType = #node_type;
+            #length_type
             #element_type
         }
-
-        #array_impl
     }
     .into()
 }
