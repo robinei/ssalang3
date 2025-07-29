@@ -1,9 +1,17 @@
 use common::Symbol;
-use macros::ast_node;
 
-use crate::{AstNode, NodeType};
+use crate::{AstNode, CompileContext, NodeType};
 
-#[ast_node(NodeType::Continue)]
 pub struct ContinueNode {
     pub label: Option<Symbol>,
+}
+
+impl AstNode for ContinueNode {
+    const NODE_TYPE: NodeType = NodeType::Continue;
+    type LengthType = ();
+    type ElementType = ();
+
+    fn compile(&self, _context: &mut CompileContext) {
+        todo!()
+    }
 }

@@ -1,9 +1,17 @@
 use common::Symbol;
-use macros::ast_node;
 
-use crate::{AstNode, NodeType};
+use crate::{AstNode, CompileContext, NodeType};
 
-#[ast_node(NodeType::Ident)]
 pub struct IdentNode {
     pub name: Symbol,
+}
+
+impl AstNode for IdentNode {
+    const NODE_TYPE: NodeType = NodeType::Ident;
+    type LengthType = ();
+    type ElementType = ();
+
+    fn compile(&self, _context: &mut CompileContext) {
+        todo!()
+    }
 }

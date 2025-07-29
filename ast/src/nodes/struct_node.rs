@@ -1,7 +1,6 @@
 use common::Symbol;
-use macros::ast_node;
 
-use crate::{AstNode, NodeHandle, NodeType};
+use crate::{AstNode, CompileContext, NodeHandle, NodeType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
@@ -10,5 +9,14 @@ pub struct StructField {
     pub type_node: NodeHandle,
 }
 
-#[ast_node(NodeType::Struct, array = StructField)]
 pub struct StructNode {}
+
+impl AstNode for StructNode {
+    const NODE_TYPE: NodeType = NodeType::Struct;
+    type LengthType = u32;
+    type ElementType = StructField;
+
+    fn compile(&self, _context: &mut CompileContext) {
+        todo!()
+    }
+}

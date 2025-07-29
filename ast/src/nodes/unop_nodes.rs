@@ -1,6 +1,4 @@
-use macros::ast_node;
-
-use crate::{AstNode, NodeHandle, NodeType};
+use crate::{AstNode, CompileContext, NodeHandle, NodeType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnopType {
@@ -9,8 +7,17 @@ pub enum UnopType {
     BitNot, // ~
 }
 
-#[ast_node(NodeType::Unop)]
 pub struct UnopNode {
     pub op_type: UnopType,
     pub operand_node: NodeHandle,
+}
+
+impl AstNode for UnopNode {
+    const NODE_TYPE: NodeType = NodeType::Unop;
+    type LengthType = ();
+    type ElementType = ();
+
+    fn compile(&self, _context: &mut CompileContext) {
+        todo!()
+    }
 }

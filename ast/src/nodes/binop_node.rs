@@ -1,6 +1,4 @@
-use macros::ast_node;
-
-use crate::{AstNode, NodeHandle, NodeType};
+use crate::{AstNode, CompileContext, NodeHandle, NodeType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinopType {
@@ -20,9 +18,18 @@ pub enum BinopType {
     BitOr,  // |
 }
 
-#[ast_node(NodeType::Binop)]
 pub struct BinopNode {
     pub op_type: BinopType,
     pub left_node: NodeHandle,
     pub right_node: NodeHandle,
+}
+
+impl AstNode for BinopNode {
+    const NODE_TYPE: NodeType = NodeType::Binop;
+    type LengthType = ();
+    type ElementType = ();
+
+    fn compile(&self, _context: &mut CompileContext) {
+        todo!()
+    }
 }

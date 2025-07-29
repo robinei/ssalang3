@@ -1,22 +1,56 @@
-use macros::ast_node;
+use crate::{AstArena, AstNode, CompileContext, NodeType, TypedNodeHandle};
 
-use crate::{AstArena, AstNode, NodeType, TypedNodeHandle};
-
-#[ast_node(NodeType::ConstUnit)]
 pub struct ConstUnitNode {}
 
-#[ast_node(NodeType::ConstBool)]
+impl AstNode for ConstUnitNode {
+    const NODE_TYPE: NodeType = NodeType::ConstUnit;
+    type LengthType = ();
+    type ElementType = ();
+
+    fn compile(&self, _context: &mut CompileContext) {
+        todo!()
+    }
+}
+
 pub struct ConstBoolNode {
     pub value: bool,
 }
 
-#[ast_node(NodeType::ConstI32)]
+impl AstNode for ConstBoolNode {
+    const NODE_TYPE: NodeType = NodeType::ConstBool;
+    type LengthType = ();
+    type ElementType = ();
+
+    fn compile(&self, _context: &mut CompileContext) {
+        todo!()
+    }
+}
+
 pub struct ConstI32Node {
     pub value: i32,
 }
 
-#[ast_node(NodeType::ConstString, array = u8)]
+impl AstNode for ConstI32Node {
+    const NODE_TYPE: NodeType = NodeType::ConstI32;
+    type LengthType = ();
+    type ElementType = ();
+
+    fn compile(&self, _context: &mut CompileContext) {
+        todo!()
+    }
+}
+
 pub struct ConstStringNode {}
+
+impl AstNode for ConstStringNode {
+    const NODE_TYPE: NodeType = NodeType::ConstString;
+    type LengthType = u32;
+    type ElementType = u8;
+
+    fn compile(&self, _context: &mut CompileContext) {
+        todo!()
+    }
+}
 
 impl ConstStringNode {
     pub fn get_string<'a>(

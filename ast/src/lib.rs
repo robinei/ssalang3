@@ -32,6 +32,8 @@ pub trait AstNode: Sized {
     const NODE_TYPE: NodeType;
     type LengthType: ArrayLen;
     type ElementType;
+
+    fn compile(&self, context: &mut CompileContext);
 }
 
 // Type-erased handle that encodes both node type and offset
@@ -70,6 +72,95 @@ impl NodeHandle {
             })
         } else {
             None
+        }
+    }
+
+    pub fn compile(self, context: &mut CompileContext) {
+        match self.node_type() {
+            NodeType::Assign => context
+                .ast
+                .get(self.typed::<nodes::AssignNode>().unwrap())
+                .compile(context),
+            NodeType::Binop => context
+                .ast
+                .get(self.typed::<nodes::BinopNode>().unwrap())
+                .compile(context),
+            NodeType::Block => context
+                .ast
+                .get(self.typed::<nodes::BlockNode>().unwrap())
+                .compile(context),
+            NodeType::Borrow => context
+                .ast
+                .get(self.typed::<nodes::BorrowNode>().unwrap())
+                .compile(context),
+            NodeType::Break => context
+                .ast
+                .get(self.typed::<nodes::BreakNode>().unwrap())
+                .compile(context),
+            NodeType::ConstUnit => context
+                .ast
+                .get(self.typed::<nodes::ConstUnitNode>().unwrap())
+                .compile(context),
+            NodeType::ConstBool => context
+                .ast
+                .get(self.typed::<nodes::ConstBoolNode>().unwrap())
+                .compile(context),
+            NodeType::ConstI32 => context
+                .ast
+                .get(self.typed::<nodes::ConstI32Node>().unwrap())
+                .compile(context),
+            NodeType::ConstString => context
+                .ast
+                .get(self.typed::<nodes::ConstStringNode>().unwrap())
+                .compile(context),
+            NodeType::Continue => context
+                .ast
+                .get(self.typed::<nodes::ContinueNode>().unwrap())
+                .compile(context),
+            NodeType::Fn => context
+                .ast
+                .get(self.typed::<nodes::FnNode>().unwrap())
+                .compile(context),
+            NodeType::Ident => context
+                .ast
+                .get(self.typed::<nodes::IdentNode>().unwrap())
+                .compile(context),
+            NodeType::If => context
+                .ast
+                .get(self.typed::<nodes::IfNode>().unwrap())
+                .compile(context),
+            NodeType::Let => context
+                .ast
+                .get(self.typed::<nodes::LetNode>().unwrap())
+                .compile(context),
+            NodeType::LetFn => context
+                .ast
+                .get(self.typed::<nodes::LetFnNode>().unwrap())
+                .compile(context),
+            NodeType::Module => context
+                .ast
+                .get(self.typed::<nodes::ModuleNode>().unwrap())
+                .compile(context),
+            NodeType::Return => context
+                .ast
+                .get(self.typed::<nodes::ReturnNode>().unwrap())
+                .compile(context),
+            NodeType::Struct => context
+                .ast
+                .get(self.typed::<nodes::StructNode>().unwrap())
+                .compile(context),
+            NodeType::TypeAtom => context
+                .ast
+                .get(self.typed::<nodes::TypeAtomNode>().unwrap())
+                .compile(context),
+            NodeType::Unop => context
+                .ast
+                .get(self.typed::<nodes::UnopNode>().unwrap())
+                .compile(context),
+            NodeType::While => context
+                .ast
+                .get(self.typed::<nodes::WhileNode>().unwrap())
+                .compile(context),
         }
     }
 }
@@ -134,12 +225,20 @@ impl<T: AstNode> TypedNodeHandle<T> {
             handle: self.handle,
         }
     }
+
+    pub fn compile(self, context: &mut CompileContext) {
+        context.ast.get(self).compile(context)
+    }
 }
 
 impl<T: AstNode> From<TypedNodeHandle<T>> for NodeHandle {
     fn from(typed: TypedNodeHandle<T>) -> Self {
         typed.untyped()
     }
+}
+
+pub struct CompileContext<'a> {
+    ast: &'a AstArena,
 }
 
 mod ast_arena;
