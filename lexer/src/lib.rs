@@ -2,9 +2,9 @@ mod lexer;
 mod token;
 mod tokentype;
 
-pub use lexer::Lexer;
-pub use token::Token;
-pub use tokentype::TokenType;
+pub use lexer::*;
+pub use token::*;
+pub use tokentype::*;
 
 #[cfg(test)]
 mod tests;

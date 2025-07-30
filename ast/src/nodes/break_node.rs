@@ -1,6 +1,6 @@
 use common::Symbol;
 
-use crate::{AstNode, CompileContext, NodeHandle, NodeType};
+use crate::{AstNode, CompileContext, CompileResult, NodeHandle, NodeType, TypedNodeHandle};
 
 pub struct BreakNode {
     pub label: Option<Symbol>,
@@ -12,7 +12,11 @@ impl AstNode for BreakNode {
     type LengthType = ();
     type ElementType = ();
 
-    fn compile(&self, _context: &mut CompileContext) {
+    fn compile(
+        &self,
+        _context: &mut CompileContext,
+        _handle: TypedNodeHandle<Self>,
+    ) -> CompileResult {
         todo!()
     }
 }

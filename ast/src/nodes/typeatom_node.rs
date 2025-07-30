@@ -1,4 +1,4 @@
-use crate::{AstNode, CompileContext, NodeType};
+use crate::{AstNode, CompileContext, CompileResult, NodeType, TypedNodeHandle};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TypeAtom {
@@ -17,7 +17,11 @@ impl AstNode for TypeAtomNode {
     type LengthType = ();
     type ElementType = ();
 
-    fn compile(&self, _context: &mut CompileContext) {
+    fn compile(
+        &self,
+        _context: &mut CompileContext,
+        _handle: TypedNodeHandle<Self>,
+    ) -> CompileResult {
         todo!()
     }
 }

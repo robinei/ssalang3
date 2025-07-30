@@ -1,6 +1,6 @@
 use common::Symbol;
 
-use crate::{AstNode, CompileContext, NodeType};
+use crate::{AstNode, CompileContext, CompileResult, NodeType, TypedNodeHandle};
 
 pub struct IdentNode {
     pub name: Symbol,
@@ -11,7 +11,11 @@ impl AstNode for IdentNode {
     type LengthType = ();
     type ElementType = ();
 
-    fn compile(&self, _context: &mut CompileContext) {
+    fn compile(
+        &self,
+        _context: &mut CompileContext,
+        _handle: TypedNodeHandle<Self>,
+    ) -> CompileResult {
         todo!()
     }
 }

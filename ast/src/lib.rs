@@ -1,40 +1,65 @@
 use std::{marker::PhantomData, num::NonZeroU32};
 
-use crate::NodeType;
+use crate::{NodeType, nodes::*};
 
-pub trait ArrayLen: Default + Copy {
-    fn create_len(value: u32) -> Self;
-    fn get_value(self) -> u32;
+mod ast_arena;
+mod ast_node;
+mod node_type;
+pub mod nodes;
+
+pub use ast_arena::*;
+pub use ast_node::*;
+use common::{Symbol, TypeId};
+use ir::{Instr, IrBuilder};
+pub use node_type::*;
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct Value {
+    pub instr: Instr,
 }
 
-impl ArrayLen for u32 {
-    fn create_len(value: u32) -> Self {
-        value
+impl Value {
+    #[inline]
+    pub fn new(instr: Instr) -> Self {
+        Self { instr }
     }
 
-    fn get_value(self) -> u32 {
-        self
-    }
-}
-
-impl ArrayLen for () {
-    fn create_len(_: u32) -> Self {
-        ()
+    #[inline]
+    pub fn unit() -> Self {
+        Self::new(Instr::nop())
     }
 
-    fn get_value(self) -> u32 {
-        0
+    #[inline]
+    pub fn get_type_id(&self) -> TypeId {
+        self.instr.get_type_id()
     }
 }
 
-// Trait that all node types must implement
-pub trait AstNode: Sized {
-    const NODE_TYPE: NodeType;
-    type LengthType: ArrayLen;
-    type ElementType;
-
-    fn compile(&self, context: &mut CompileContext);
+pub enum CompileError {
+    Return(Value),
+    Break(Option<Symbol>, Value),
+    Continue(Option<Symbol>),
+    Error(Option<NodeHandle>, String),
 }
+
+impl CompileError {
+    fn type_error(
+        node: Option<NodeHandle>,
+        expected: TypeId,
+        found: TypeId,
+        errcontext: String,
+    ) -> CompileError {
+        CompileError::Error(
+            node,
+            format!(
+                "expected type {}, but found type {} in {}",
+                expected, found, errcontext
+            ),
+        )
+    }
+}
+
+type CompileResult = Result<Value, CompileError>;
 
 // Type-erased handle that encodes both node type and offset
 // Uses niche optimization: node type 0 is reserved as sentinel for None in Option<NodeHandle>
@@ -54,16 +79,19 @@ impl std::fmt::Debug for NodeHandle {
 }
 
 impl NodeHandle {
+    #[inline]
     pub fn node_type(self) -> NodeType {
         // Safety: We control construction and NodeType has valid discriminants 1-21
         unsafe { std::mem::transmute((self.handle.get() & 0xFF) as u8) }
     }
 
+    #[inline]
     pub fn byte_offset(self) -> u32 {
         (self.handle.get() >> 8) * 4
     }
 
     // Convert to strongly typed handle if types match
+    #[inline]
     pub fn typed<T: AstNode>(self) -> Option<TypedNodeHandle<T>> {
         if self.node_type() == T::NODE_TYPE {
             Some(TypedNodeHandle::<T> {
@@ -75,93 +103,42 @@ impl NodeHandle {
         }
     }
 
-    pub fn compile(self, context: &mut CompileContext) {
+    #[inline]
+    fn comp<T: AstNode>(self, context: &mut CompileContext) -> CompileResult {
+        self.typed::<T>().unwrap().compile(context)
+    }
+
+    pub fn compile(self, context: &mut CompileContext) -> CompileResult {
         match self.node_type() {
-            NodeType::Assign => context
-                .ast
-                .get(self.typed::<nodes::AssignNode>().unwrap())
-                .compile(context),
-            NodeType::Binop => context
-                .ast
-                .get(self.typed::<nodes::BinopNode>().unwrap())
-                .compile(context),
-            NodeType::Block => context
-                .ast
-                .get(self.typed::<nodes::BlockNode>().unwrap())
-                .compile(context),
-            NodeType::Borrow => context
-                .ast
-                .get(self.typed::<nodes::BorrowNode>().unwrap())
-                .compile(context),
-            NodeType::Break => context
-                .ast
-                .get(self.typed::<nodes::BreakNode>().unwrap())
-                .compile(context),
-            NodeType::ConstUnit => context
-                .ast
-                .get(self.typed::<nodes::ConstUnitNode>().unwrap())
-                .compile(context),
-            NodeType::ConstBool => context
-                .ast
-                .get(self.typed::<nodes::ConstBoolNode>().unwrap())
-                .compile(context),
-            NodeType::ConstI32 => context
-                .ast
-                .get(self.typed::<nodes::ConstI32Node>().unwrap())
-                .compile(context),
-            NodeType::ConstString => context
-                .ast
-                .get(self.typed::<nodes::ConstStringNode>().unwrap())
-                .compile(context),
-            NodeType::Continue => context
-                .ast
-                .get(self.typed::<nodes::ContinueNode>().unwrap())
-                .compile(context),
-            NodeType::Fn => context
-                .ast
-                .get(self.typed::<nodes::FnNode>().unwrap())
-                .compile(context),
-            NodeType::Ident => context
-                .ast
-                .get(self.typed::<nodes::IdentNode>().unwrap())
-                .compile(context),
-            NodeType::If => context
-                .ast
-                .get(self.typed::<nodes::IfNode>().unwrap())
-                .compile(context),
-            NodeType::Let => context
-                .ast
-                .get(self.typed::<nodes::LetNode>().unwrap())
-                .compile(context),
-            NodeType::LetFn => context
-                .ast
-                .get(self.typed::<nodes::LetFnNode>().unwrap())
-                .compile(context),
-            NodeType::Module => context
-                .ast
-                .get(self.typed::<nodes::ModuleNode>().unwrap())
-                .compile(context),
-            NodeType::Return => context
-                .ast
-                .get(self.typed::<nodes::ReturnNode>().unwrap())
-                .compile(context),
-            NodeType::Struct => context
-                .ast
-                .get(self.typed::<nodes::StructNode>().unwrap())
-                .compile(context),
-            NodeType::TypeAtom => context
-                .ast
-                .get(self.typed::<nodes::TypeAtomNode>().unwrap())
-                .compile(context),
-            NodeType::Unop => context
-                .ast
-                .get(self.typed::<nodes::UnopNode>().unwrap())
-                .compile(context),
-            NodeType::While => context
-                .ast
-                .get(self.typed::<nodes::WhileNode>().unwrap())
-                .compile(context),
+            NodeType::Assign => self.comp::<AssignNode>(context),
+            NodeType::Binop => self.comp::<BinopNode>(context),
+            NodeType::Block => self.comp::<BlockNode>(context),
+            NodeType::Borrow => self.comp::<BorrowNode>(context),
+            NodeType::Break => self.comp::<BreakNode>(context),
+            NodeType::ConstUnit => self.comp::<ConstUnitNode>(context),
+            NodeType::ConstBool => self.comp::<ConstBoolNode>(context),
+            NodeType::ConstI32 => self.comp::<ConstI32Node>(context),
+            NodeType::ConstString => self.comp::<ConstStringNode>(context),
+            NodeType::Continue => self.comp::<ContinueNode>(context),
+            NodeType::Fn => self.comp::<FnNode>(context),
+            NodeType::Ident => self.comp::<IdentNode>(context),
+            NodeType::If => self.comp::<IfNode>(context),
+            NodeType::Let => self.comp::<LetNode>(context),
+            NodeType::LetFn => self.comp::<LetFnNode>(context),
+            NodeType::Module => self.comp::<ModuleNode>(context),
+            NodeType::Return => self.comp::<ReturnNode>(context),
+            NodeType::Struct => self.comp::<StructNode>(context),
+            NodeType::TypeAtom => self.comp::<TypeAtomNode>(context),
+            NodeType::Unop => self.comp::<UnopNode>(context),
+            NodeType::While => self.comp::<WhileNode>(context),
         }
+    }
+}
+
+impl<T: AstNode> From<TypedNodeHandle<T>> for NodeHandle {
+    #[inline]
+    fn from(typed: TypedNodeHandle<T>) -> Self {
+        typed.untyped()
     }
 }
 
@@ -177,6 +154,7 @@ pub struct TypedNodeHandle<T: AstNode> {
 // manually implement these because the derive macro is confused and refuses to impl them because of the T (which does not have these bounds) in PhantomData
 impl<T: AstNode> Copy for TypedNodeHandle<T> {}
 impl<T: AstNode> Clone for TypedNodeHandle<T> {
+    #[inline]
     fn clone(&self) -> Self {
         *self
     }
@@ -193,6 +171,7 @@ impl<T: AstNode> std::fmt::Debug for TypedNodeHandle<T> {
 }
 
 impl<T: AstNode> TypedNodeHandle<T> {
+    #[inline]
     fn new(byte_offset: u32) -> Self {
         debug_assert!(byte_offset % 4 == 0, "Byte offset must be 4-byte aligned");
         let offset_div4 = byte_offset / 4;
@@ -211,39 +190,50 @@ impl<T: AstNode> TypedNodeHandle<T> {
         }
     }
 
+    #[inline]
     pub fn node_type(self) -> NodeType {
         T::NODE_TYPE
     }
 
+    #[inline]
     pub fn byte_offset(self) -> u32 {
         (self.handle.get() >> 8) * 4
     }
 
     // Convert to type-erased handle
+    #[inline]
     pub fn untyped(self) -> NodeHandle {
         NodeHandle {
             handle: self.handle,
         }
     }
 
-    pub fn compile(self, context: &mut CompileContext) {
-        context.ast.get(self).compile(context)
-    }
-}
-
-impl<T: AstNode> From<TypedNodeHandle<T>> for NodeHandle {
-    fn from(typed: TypedNodeHandle<T>) -> Self {
-        typed.untyped()
+    #[inline]
+    pub fn compile(self, context: &mut CompileContext) -> CompileResult {
+        let result = context.ast.get(self).compile(context, self)?;
+        if context.static_eval && !result.instr.is_const() {
+            return Err(CompileError::Error(
+                Some(self.untyped()),
+                "expected const value".to_string(),
+            ));
+        }
+        Ok(result)
     }
 }
 
 pub struct CompileContext<'a> {
-    ast: &'a AstArena,
+    pub ast: &'a AstArena,
+    pub irbuilder: &'a mut IrBuilder,
+    static_eval: bool,
 }
 
-mod ast_arena;
-mod node_type;
-pub mod nodes;
-
-pub use ast_arena::*;
-pub use node_type::*;
+impl<'a> CompileContext<'a> {
+    #[inline]
+    fn with_static_eval<R, F: FnOnce(&mut Self) -> R>(&mut self, static_eval: bool, f: F) -> R {
+        let prev = self.static_eval;
+        self.static_eval = self.static_eval || static_eval;
+        let result = f(self);
+        self.static_eval = prev;
+        result
+    }
+}

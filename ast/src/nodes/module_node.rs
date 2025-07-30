@@ -1,4 +1,4 @@
-use crate::{AstNode, CompileContext, NodeType, TypedNodeHandle, nodes::BlockNode};
+use crate::{AstNode, CompileContext, CompileResult, NodeType, TypedNodeHandle, nodes::BlockNode};
 
 pub struct ModuleNode {
     pub body_node: TypedNodeHandle<BlockNode>,
@@ -9,7 +9,11 @@ impl AstNode for ModuleNode {
     type LengthType = ();
     type ElementType = ();
 
-    fn compile(&self, _context: &mut CompileContext) {
+    fn compile(
+        &self,
+        _context: &mut CompileContext,
+        _handle: TypedNodeHandle<Self>,
+    ) -> CompileResult {
         todo!()
     }
 }

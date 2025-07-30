@@ -93,14 +93,17 @@ impl Type {
 pub struct TypeId(u32);
 
 impl TypeId {
+    #[inline]
     pub fn new(id: u32) -> Self {
         Self(id)
     }
 
+    #[inline]
     pub fn as_u32(self) -> u32 {
         self.0
     }
 
+    #[inline]
     pub fn as_i32(self) -> i32 {
         self.0 as i32
     }
@@ -109,15 +112,19 @@ impl TypeId {
         TYPES.read().unwrap().lookup_type(self)
     }
 
+    #[inline]
     pub fn unit_id() -> TypeId {
         CACHE.unit_id
     }
+    #[inline]
     pub fn bool_id() -> TypeId {
         CACHE.bool_id
     }
+    #[inline]
     pub fn i32_id() -> TypeId {
         CACHE.i32_id
     }
+    #[inline]
     pub fn type_id() -> TypeId {
         CACHE.type_id
     }

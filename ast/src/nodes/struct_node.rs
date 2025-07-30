@@ -1,6 +1,6 @@
 use common::Symbol;
 
-use crate::{AstNode, CompileContext, NodeHandle, NodeType};
+use crate::{AstNode, CompileContext, CompileResult, NodeHandle, NodeType, TypedNodeHandle};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
@@ -16,7 +16,11 @@ impl AstNode for StructNode {
     type LengthType = u32;
     type ElementType = StructField;
 
-    fn compile(&self, _context: &mut CompileContext) {
+    fn compile(
+        &self,
+        _context: &mut CompileContext,
+        _handle: TypedNodeHandle<Self>,
+    ) -> CompileResult {
         todo!()
     }
 }

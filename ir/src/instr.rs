@@ -17,75 +17,91 @@ pub struct PhiRef(NonZeroI16);
 pub struct VarRef(NonZeroI16);
 
 impl InstrRef {
+    #[inline]
     pub fn new(value: RefType) -> Option<Self> {
         NonZeroI16::new(value).map(Self)
     }
+    #[inline]
     pub fn get(self) -> RefType {
         self.0.get()
     }
 }
 impl BlockRef {
+    #[inline]
     pub fn new(value: RefType) -> Option<Self> {
         NonZeroI16::new(value).map(Self)
     }
+    #[inline]
     pub fn get(self) -> RefType {
         self.0.get()
     }
 }
 impl PhiRef {
+    #[inline]
     pub fn new(value: RefType) -> Option<Self> {
         NonZeroI16::new(value).map(Self)
     }
+    #[inline]
     pub fn get(self) -> RefType {
         self.0.get()
     }
 }
 impl VarRef {
+    #[inline]
     pub fn new(value: RefType) -> Option<Self> {
         NonZeroI16::new(value).map(Self)
     }
+    #[inline]
     pub fn get(self) -> RefType {
         self.0.get()
     }
 }
 
 impl From<InstrRef> for RefType {
+    #[inline]
     fn from(value: InstrRef) -> Self {
         value.get()
     }
 }
 impl From<BlockRef> for RefType {
+    #[inline]
     fn from(value: BlockRef) -> Self {
         value.get()
     }
 }
 impl From<PhiRef> for RefType {
+    #[inline]
     fn from(value: PhiRef) -> Self {
         value.get()
     }
 }
 impl From<VarRef> for RefType {
+    #[inline]
     fn from(value: VarRef) -> Self {
         value.get()
     }
 }
 
 impl From<RefType> for InstrRef {
+    #[inline]
     fn from(value: RefType) -> Self {
         Self(std::num::NonZeroI16::new(value).unwrap())
     }
 }
 impl From<RefType> for BlockRef {
+    #[inline]
     fn from(value: RefType) -> Self {
         Self(std::num::NonZeroI16::new(value).unwrap())
     }
 }
 impl From<RefType> for PhiRef {
+    #[inline]
     fn from(value: RefType) -> Self {
         Self(std::num::NonZeroI16::new(value).unwrap())
     }
 }
 impl From<RefType> for VarRef {
+    #[inline]
     fn from(value: RefType) -> Self {
         Self(std::num::NonZeroI16::new(value).unwrap())
     }
@@ -95,18 +111,22 @@ impl From<RefType> for VarRef {
 pub struct Meta(u32);
 
 impl Meta {
+    #[inline]
     pub fn new(ty: TypeId) -> Self {
         Self(ty.as_u32())
     }
 
+    #[inline]
     pub fn get_type_id(self) -> TypeId {
         TypeId::new(self.0 & 0x7FFFFFFF)
     }
 
+    #[inline]
     pub fn is_marked(self) -> bool {
         (self.0 & 0x80000000) != 0
     }
 
+    #[inline]
     pub fn set_marked(&mut self, marked: bool) {
         if marked {
             self.0 |= 0x80000000;
@@ -235,10 +255,12 @@ impl Instr {
         }
     }
 
+    #[inline]
     pub fn get_type_id(&self) -> TypeId {
         self.get_meta().get_type_id()
     }
 
+    #[inline]
     pub fn is_marked(&self) -> bool {
         self.get_meta().is_marked()
     }

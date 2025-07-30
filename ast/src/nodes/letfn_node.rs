@@ -1,7 +1,7 @@
 use common::Symbol;
 
 use crate::{
-    AstNode, CompileContext, NodeType, TypedNodeHandle,
+    AstNode, CompileContext, CompileResult, NodeType, TypedNodeHandle,
     nodes::{FnNode, LetNode},
 };
 
@@ -15,13 +15,17 @@ impl AstNode for LetFnNode {
     type LengthType = ();
     type ElementType = ();
 
-    fn compile(&self, context: &mut CompileContext) {
+    fn compile(
+        &self,
+        context: &mut CompileContext,
+        _handle: TypedNodeHandle<Self>,
+    ) -> CompileResult {
         LetNode {
             name: self.name,
             is_mutable: false,
             type_node: None,
             value_node: Some(self.fn_node.untyped()),
         }
-        .compile(context)
+        .compile_let(context)
     }
 }

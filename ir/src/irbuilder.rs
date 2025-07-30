@@ -202,12 +202,12 @@ impl IrBuilder {
         }
     }
 
-    pub fn print(&mut self, val: Instr) {
+    pub fn emit_print(&mut self, val: Instr) {
         let instr_ref = self.intern_instr(val);
         self.emit_instr_pinned(Instr::Print(Meta::new(TypeId::unit_id()), instr_ref));
     }
 
-    pub fn label(&mut self, block: BlockRef) {
+    pub fn emit_label(&mut self, block: BlockRef) {
         assert!(
             self.curr_block.is_none() || self.blocks.get(self.curr_block.unwrap()).last.is_some()
         );
@@ -224,7 +224,7 @@ impl IrBuilder {
         self.curr_block = Some(block);
     }
 
-    pub fn jump(&mut self, target: BlockRef) {
+    pub fn emit_jump(&mut self, target: BlockRef) {
         self.blocks.get_mut(target);
 
         let curr_block = self.curr_block.expect("No current block for jump");
@@ -246,7 +246,7 @@ impl IrBuilder {
         b.last = Some(jump_instr);
     }
 
-    pub fn branch(&mut self, cond: Instr, true_target: BlockRef, false_target: BlockRef) {
+    pub fn emit_branch(&mut self, cond: Instr, true_target: BlockRef, false_target: BlockRef) {
         let curr_block = self.curr_block.expect("No current block for branch");
 
         // Validate state
@@ -262,13 +262,13 @@ impl IrBuilder {
 
         // Optimize constant branches
         if let Instr::ConstBool(_, val) = cond {
-            self.jump(if val { true_target } else { false_target });
+            self.emit_jump(if val { true_target } else { false_target });
             return;
         }
 
         // Optimize same target branches
         if true_target == false_target {
-            self.jump(true_target);
+            self.emit_jump(true_target);
             return;
         }
 
@@ -289,7 +289,7 @@ impl IrBuilder {
         b.last = Some(branch_instr);
     }
 
-    pub fn ret(&mut self, retval: Instr) {
+    pub fn emit_ret(&mut self, retval: Instr) {
         let curr_block = self.curr_block.expect("No current block for ret");
         assert!(self.blocks.get(curr_block).last.is_none());
 
@@ -299,7 +299,7 @@ impl IrBuilder {
         self.blocks.get_mut(curr_block).last = Some(ret_instr);
     }
 
-    pub fn upsilon(&mut self, block: BlockRef, phi: PhiRef, val: Instr) {
+    pub fn emit_upsilon(&mut self, block: BlockRef, phi: PhiRef, val: Instr) {
         let val_ref = self.intern_instr(val);
         let instr_ref = self.append_block_instr(
             block,
@@ -309,7 +309,7 @@ impl IrBuilder {
         self.phis.get_mut(phi).upsilons.push(instr_ref);
     }
 
-    pub fn phi(&mut self, phi: PhiRef, ty: TypeId) -> Instr {
+    pub fn emit_phi(&mut self, phi: PhiRef, ty: TypeId) -> Instr {
         assert_ne!(ty, TypeId::unit_id());
         assert!(self.phis.get_mut(phi).instr.is_none());
 
@@ -319,13 +319,13 @@ impl IrBuilder {
         Instr::Identity(Meta::new(ty), instr_ref)
     }
 
-    pub fn arg(&self, arg: i32, ty: TypeId) -> Instr {
+    pub fn emit_arg(&self, arg: i32, ty: TypeId) -> Instr {
         assert!(arg >= 0);
         assert_ne!(ty, TypeId::unit_id());
         Instr::Arg(Meta::new(ty), arg)
     }
 
-    pub fn add(&mut self, lhs: Instr, rhs: Instr) -> Instr {
+    pub fn emit_add(&mut self, lhs: Instr, rhs: Instr) -> Instr {
         assert_eq!(lhs.get_type_id(), rhs.get_type_id());
 
         // Constant folding
@@ -347,45 +347,7 @@ impl IrBuilder {
         Instr::Add(Meta::new(lhs.get_type_id()), lhs_ref, rhs_ref)
     }
 
-    pub fn eq(&mut self, lhs: Instr, rhs: Instr) -> Instr {
-        assert_eq!(lhs.get_type_id(), rhs.get_type_id());
-
-        // Constant folding
-        match (lhs, rhs) {
-            (Instr::ConstBool(_, lval), Instr::ConstBool(_, rval)) => {
-                return Instr::const_bool(lval == rval);
-            }
-            (Instr::ConstI32(_, lval), Instr::ConstI32(_, rval)) => {
-                return Instr::const_bool(lval == rval);
-            }
-            _ => {}
-        }
-
-        let lhs_ref = self.intern_instr(lhs);
-        let rhs_ref = self.intern_instr(rhs);
-        Instr::Eq(Meta::new(TypeId::bool_id()), lhs_ref, rhs_ref)
-    }
-
-    pub fn neq(&mut self, lhs: Instr, rhs: Instr) -> Instr {
-        assert_eq!(lhs.get_type_id(), rhs.get_type_id());
-
-        // Constant folding
-        match (lhs, rhs) {
-            (Instr::ConstBool(_, lval), Instr::ConstBool(_, rval)) => {
-                return Instr::const_bool(lval != rval);
-            }
-            (Instr::ConstI32(_, lval), Instr::ConstI32(_, rval)) => {
-                return Instr::const_bool(lval != rval);
-            }
-            _ => {}
-        }
-
-        let lhs_ref = self.intern_instr(lhs);
-        let rhs_ref = self.intern_instr(rhs);
-        Instr::Neq(Meta::new(TypeId::bool_id()), lhs_ref, rhs_ref)
-    }
-
-    pub fn sub(&mut self, lhs: Instr, rhs: Instr) -> Instr {
+    pub fn emit_sub(&mut self, lhs: Instr, rhs: Instr) -> Instr {
         assert_eq!(lhs.get_type_id(), rhs.get_type_id());
 
         // Constant folding
@@ -404,7 +366,7 @@ impl IrBuilder {
         Instr::Sub(Meta::new(lhs.get_type_id()), lhs_ref, rhs_ref)
     }
 
-    pub fn mul(&mut self, lhs: Instr, rhs: Instr) -> Instr {
+    pub fn emit_mul(&mut self, lhs: Instr, rhs: Instr) -> Instr {
         assert_eq!(lhs.get_type_id(), rhs.get_type_id());
 
         // Constant folding
@@ -429,7 +391,7 @@ impl IrBuilder {
         Instr::Mul(Meta::new(lhs.get_type_id()), lhs_ref, rhs_ref)
     }
 
-    pub fn div(&mut self, lhs: Instr, rhs: Instr) -> Instr {
+    pub fn emit_div(&mut self, lhs: Instr, rhs: Instr) -> Instr {
         assert_eq!(lhs.get_type_id(), rhs.get_type_id());
 
         // Constant folding
@@ -451,7 +413,45 @@ impl IrBuilder {
         Instr::Div(Meta::new(lhs.get_type_id()), lhs_ref, rhs_ref)
     }
 
-    pub fn lt(&mut self, lhs: Instr, rhs: Instr) -> Instr {
+    pub fn emit_eq(&mut self, lhs: Instr, rhs: Instr) -> Instr {
+        assert_eq!(lhs.get_type_id(), rhs.get_type_id());
+
+        // Constant folding
+        match (lhs, rhs) {
+            (Instr::ConstBool(_, lval), Instr::ConstBool(_, rval)) => {
+                return Instr::const_bool(lval == rval);
+            }
+            (Instr::ConstI32(_, lval), Instr::ConstI32(_, rval)) => {
+                return Instr::const_bool(lval == rval);
+            }
+            _ => {}
+        }
+
+        let lhs_ref = self.intern_instr(lhs);
+        let rhs_ref = self.intern_instr(rhs);
+        Instr::Eq(Meta::new(TypeId::bool_id()), lhs_ref, rhs_ref)
+    }
+
+    pub fn emit_neq(&mut self, lhs: Instr, rhs: Instr) -> Instr {
+        assert_eq!(lhs.get_type_id(), rhs.get_type_id());
+
+        // Constant folding
+        match (lhs, rhs) {
+            (Instr::ConstBool(_, lval), Instr::ConstBool(_, rval)) => {
+                return Instr::const_bool(lval != rval);
+            }
+            (Instr::ConstI32(_, lval), Instr::ConstI32(_, rval)) => {
+                return Instr::const_bool(lval != rval);
+            }
+            _ => {}
+        }
+
+        let lhs_ref = self.intern_instr(lhs);
+        let rhs_ref = self.intern_instr(rhs);
+        Instr::Neq(Meta::new(TypeId::bool_id()), lhs_ref, rhs_ref)
+    }
+
+    pub fn emit_lt(&mut self, lhs: Instr, rhs: Instr) -> Instr {
         assert_eq!(lhs.get_type_id(), rhs.get_type_id());
 
         // Constant folding
@@ -467,7 +467,7 @@ impl IrBuilder {
         Instr::Lt(Meta::new(TypeId::bool_id()), lhs_ref, rhs_ref)
     }
 
-    pub fn gt(&mut self, lhs: Instr, rhs: Instr) -> Instr {
+    pub fn emit_gt(&mut self, lhs: Instr, rhs: Instr) -> Instr {
         assert_eq!(lhs.get_type_id(), rhs.get_type_id());
 
         // Constant folding
@@ -483,7 +483,7 @@ impl IrBuilder {
         Instr::Gt(Meta::new(TypeId::bool_id()), lhs_ref, rhs_ref)
     }
 
-    pub fn lt_eq(&mut self, lhs: Instr, rhs: Instr) -> Instr {
+    pub fn emit_lt_eq(&mut self, lhs: Instr, rhs: Instr) -> Instr {
         assert_eq!(lhs.get_type_id(), rhs.get_type_id());
 
         // Constant folding
@@ -499,7 +499,7 @@ impl IrBuilder {
         Instr::LtEq(Meta::new(TypeId::bool_id()), lhs_ref, rhs_ref)
     }
 
-    pub fn gt_eq(&mut self, lhs: Instr, rhs: Instr) -> Instr {
+    pub fn emit_gt_eq(&mut self, lhs: Instr, rhs: Instr) -> Instr {
         assert_eq!(lhs.get_type_id(), rhs.get_type_id());
 
         // Constant folding
@@ -515,7 +515,7 @@ impl IrBuilder {
         Instr::GtEq(Meta::new(TypeId::bool_id()), lhs_ref, rhs_ref)
     }
 
-    pub fn and(&mut self, lhs: Instr, rhs: Instr) -> Instr {
+    pub fn emit_logi_and(&mut self, lhs: Instr, rhs: Instr) -> Instr {
         assert_eq!(lhs.get_type_id(), TypeId::bool_id());
         assert_eq!(rhs.get_type_id(), TypeId::bool_id());
 
@@ -541,7 +541,7 @@ impl IrBuilder {
         Instr::And(Meta::new(TypeId::bool_id()), lhs_ref, rhs_ref)
     }
 
-    pub fn or(&mut self, lhs: Instr, rhs: Instr) -> Instr {
+    pub fn emit_logi_or(&mut self, lhs: Instr, rhs: Instr) -> Instr {
         assert_eq!(lhs.get_type_id(), TypeId::bool_id());
         assert_eq!(rhs.get_type_id(), TypeId::bool_id());
 
@@ -567,7 +567,7 @@ impl IrBuilder {
         Instr::Or(Meta::new(TypeId::bool_id()), lhs_ref, rhs_ref)
     }
 
-    pub fn neg(&mut self, operand: Instr) -> Instr {
+    pub fn emit_neg(&mut self, operand: Instr) -> Instr {
         assert_eq!(operand.get_type_id(), TypeId::i32_id());
 
         // Constant folding
@@ -582,7 +582,7 @@ impl IrBuilder {
         Instr::Neg(Meta::new(TypeId::i32_id()), operand_ref)
     }
 
-    pub fn not(&mut self, operand: Instr) -> Instr {
+    pub fn emit_logi_not(&mut self, operand: Instr) -> Instr {
         assert_eq!(operand.get_type_id(), TypeId::bool_id());
 
         // Constant folding
@@ -658,7 +658,7 @@ impl IrBuilder {
         // Multiple different values or all values are phi itself - keep the phi
         // Create upsilons for all predecessors
         for (pred, val) in preds.into_iter().zip(values.into_iter()) {
-            self.upsilon(pred, phi, val);
+            self.emit_upsilon(pred, phi, val);
         }
 
         phi_instr
@@ -700,7 +700,7 @@ impl IrBuilder {
             // Create incomplete phi
             let phi = self.create_phi_var(var);
             self.blocks.get_mut(block).incomplete_phis.push(phi);
-            self.phi(phi, var_type)
+            self.emit_phi(phi, var_type)
         } else {
             let pred_count = self.blocks.get(block).preds.len();
             if pred_count == 0 {
@@ -717,7 +717,7 @@ impl IrBuilder {
             } else {
                 // Multiple predecessors - create phi
                 let phi = self.create_phi_var(var);
-                let result = self.phi(phi, var_type);
+                let result = self.emit_phi(phi, var_type);
                 self.write_variable(block, var, result);
                 // create_pred_upsilons may eliminate the phi and return a different value
                 self.create_pred_upsilons(block, phi)
@@ -746,12 +746,12 @@ mod tests {
         // Create a simple block with some instructions
         let entry_block = builder.create_block();
         builder.seal_block(entry_block);
-        builder.label(entry_block);
+        builder.emit_label(entry_block);
 
         // Create a simple computation: return 5 + 5
         let const5 = Instr::const_i32(5);
-        let add_result = builder.add(const5, const5);
-        builder.ret(add_result);
+        let add_result = builder.emit_add(const5, const5);
+        builder.emit_ret(add_result);
 
         // Verify we have created the expected number of blocks
         assert_eq!(builder.blocks.len(), 1); // RefMap counts user blocks (entry_block)
@@ -784,7 +784,7 @@ mod tests {
 
         // Create phi node
         let phi = builder.create_phi();
-        let phi_instr = builder.phi(phi, TypeId::i32_id());
+        let phi_instr = builder.emit_phi(phi, TypeId::i32_id());
 
         // Should create an identity instruction pointing to the phi
         match phi_instr {
@@ -833,12 +833,12 @@ mod tests {
         let mut builder = IrBuilder::new();
         let entry_block = builder.create_block();
         builder.seal_block(entry_block);
-        builder.label(entry_block);
+        builder.emit_label(entry_block);
 
         // Emit some instructions
         let const_instr = Instr::const_i32(42);
-        let add_result = builder.add(const_instr, const_instr);
-        builder.ret(add_result);
+        let add_result = builder.emit_add(const_instr, const_instr);
+        builder.emit_ret(add_result);
 
         // Verify we have user instructions (more than 0, since Nop doesn't count)
         assert!(builder.code.pinned_count() > 0);
@@ -854,21 +854,21 @@ mod tests {
         let zero = Instr::const_i32(0);
         let two = Instr::const_i32(2);
         let three = Instr::const_i32(3);
-        let arg = builder.arg(0, TypeId::i32_id());
+        let arg = builder.emit_arg(0, TypeId::i32_id());
 
-        let result1 = builder.add(zero, arg);
+        let result1 = builder.emit_add(zero, arg);
         match result1 {
             Instr::Arg(_, arg_idx) => assert_eq!(arg_idx, 0),
             _ => panic!("Expected arg instruction, got {:?}", result1),
         }
 
-        let result2 = builder.add(arg, zero);
+        let result2 = builder.emit_add(arg, zero);
         match result2 {
             Instr::Arg(_, arg_idx) => assert_eq!(arg_idx, 0),
             _ => panic!("Expected arg instruction, got {:?}", result2),
         }
 
-        let result3 = builder.add(two, three);
+        let result3 = builder.emit_add(two, three);
         match result3 {
             Instr::ConstI32(_, val) => assert_eq!(val, 5),
             _ => panic!("Expected constant 5, got {:?}", result3),
@@ -885,10 +885,10 @@ mod tests {
 
         // Seal and label first block
         builder.seal_block(block1);
-        builder.label(block1);
+        builder.emit_label(block1);
 
         // Jump to second block - this should populate predecessors correctly
-        builder.jump(block2);
+        builder.emit_jump(block2);
         builder.seal_block(block2);
 
         // Verify that block2's preds contains block1
@@ -934,18 +934,18 @@ mod tests {
 
         // Set up block1 with a constant
         builder.seal_block(block1);
-        builder.label(block1);
+        builder.emit_label(block1);
         builder.write_variable(block1, var, Instr::const_i32(42));
-        builder.jump(block3);
+        builder.emit_jump(block3);
 
         // Set up block2 with same constant
         builder.seal_block(block2);
-        builder.label(block2);
+        builder.emit_label(block2);
         builder.write_variable(block2, var, Instr::const_i32(42));
-        builder.jump(block3);
+        builder.emit_jump(block3);
 
         // block3 should create a phi that gets eliminated
-        builder.label(block3);
+        builder.emit_label(block3);
         builder.seal_block(block3); // Seal first so phi processing happens immediately
         let phi_result = builder.read_variable(block3, var); // Now read the optimized result
 
@@ -970,7 +970,7 @@ mod tests {
         let var = builder.create_variable(TypeId::i32_id());
 
         builder.seal_block(entry_block);
-        builder.label(entry_block);
+        builder.emit_label(entry_block);
 
         // This should panic since we're reading an undefined variable in entry block
         builder.read_variable(entry_block, var);
@@ -988,17 +988,17 @@ mod tests {
 
         // Set up a scenario that will create phi nodes
         builder.seal_block(block1);
-        builder.label(block1);
+        builder.emit_label(block1);
         builder.write_variable(block1, var, Instr::const_i32(10));
-        builder.jump(block3);
+        builder.emit_jump(block3);
 
         builder.seal_block(block2);
-        builder.label(block2);
+        builder.emit_label(block2);
         builder.write_variable(block2, var, Instr::const_i32(20));
-        builder.jump(block3);
+        builder.emit_jump(block3);
 
         // Create phi in block3 (multiple predecessors)
-        builder.label(block3);
+        builder.emit_label(block3);
         let _phi_val = builder.read_variable(block3, var);
         builder.seal_block(block3);
 
@@ -1017,70 +1017,70 @@ mod tests {
         let one = Instr::const_i32(1);
 
         // Test subtraction with optimizations
-        let sub_result = builder.sub(three, two);
+        let sub_result = builder.emit_sub(three, two);
         match sub_result {
             Instr::ConstI32(_, val) => assert_eq!(val, 1),
             _ => panic!("Expected constant folding for subtraction"),
         }
 
-        let sub_zero = builder.sub(three, zero);
+        let sub_zero = builder.emit_sub(three, zero);
         match sub_zero {
             Instr::ConstI32(_, val) => assert_eq!(val, 3),
             _ => panic!("Expected x - 0 = x optimization"),
         }
 
         // Test multiplication with optimizations
-        let mul_result = builder.mul(two, three);
+        let mul_result = builder.emit_mul(two, three);
         match mul_result {
             Instr::ConstI32(_, val) => assert_eq!(val, 6),
             _ => panic!("Expected constant folding for multiplication"),
         }
 
-        let mul_zero = builder.mul(three, zero);
+        let mul_zero = builder.emit_mul(three, zero);
         match mul_zero {
             Instr::ConstI32(_, val) => assert_eq!(val, 0),
             _ => panic!("Expected x * 0 = 0 optimization"),
         }
 
-        let mul_one = builder.mul(three, one);
+        let mul_one = builder.emit_mul(three, one);
         match mul_one {
             Instr::ConstI32(_, val) => assert_eq!(val, 3),
             _ => panic!("Expected x * 1 = x optimization"),
         }
 
         // Test division with optimizations
-        let div_result = builder.div(Instr::const_i32(6), two);
+        let div_result = builder.emit_div(Instr::const_i32(6), two);
         match div_result {
             Instr::ConstI32(_, val) => assert_eq!(val, 3),
             _ => panic!("Expected constant folding for division"),
         }
 
-        let div_one = builder.div(three, one);
+        let div_one = builder.emit_div(three, one);
         match div_one {
             Instr::ConstI32(_, val) => assert_eq!(val, 3),
             _ => panic!("Expected x / 1 = x optimization"),
         }
 
         // Test comparison operators
-        let lt_result = builder.lt(two, three);
+        let lt_result = builder.emit_lt(two, three);
         match lt_result {
             Instr::ConstBool(_, val) => assert_eq!(val, true),
             _ => panic!("Expected constant folding for less than"),
         }
 
-        let gt_result = builder.gt(three, two);
+        let gt_result = builder.emit_gt(three, two);
         match gt_result {
             Instr::ConstBool(_, val) => assert_eq!(val, true),
             _ => panic!("Expected constant folding for greater than"),
         }
 
-        let lt_eq_result = builder.lt_eq(two, two);
+        let lt_eq_result = builder.emit_lt_eq(two, two);
         match lt_eq_result {
             Instr::ConstBool(_, val) => assert_eq!(val, true),
             _ => panic!("Expected constant folding for less than or equal"),
         }
 
-        let gt_eq_result = builder.gt_eq(three, three);
+        let gt_eq_result = builder.emit_gt_eq(three, three);
         match gt_eq_result {
             Instr::ConstBool(_, val) => assert_eq!(val, true),
             _ => panic!("Expected constant folding for greater than or equal"),
@@ -1090,38 +1090,38 @@ mod tests {
         let true_val = Instr::const_bool(true);
         let false_val = Instr::const_bool(false);
 
-        let and_result = builder.and(true_val, false_val);
+        let and_result = builder.emit_logi_and(true_val, false_val);
         match and_result {
             Instr::ConstBool(_, val) => assert_eq!(val, false),
             _ => panic!("Expected constant folding for AND"),
         }
 
-        let and_true = builder.and(true_val, true_val);
+        let and_true = builder.emit_logi_and(true_val, true_val);
         match and_true {
             Instr::ConstBool(_, val) => assert_eq!(val, true),
             _ => panic!("Expected true && true = true optimization"),
         }
 
-        let or_result = builder.or(false_val, true_val);
+        let or_result = builder.emit_logi_or(false_val, true_val);
         match or_result {
             Instr::ConstBool(_, val) => assert_eq!(val, true),
             _ => panic!("Expected constant folding for OR"),
         }
 
-        let or_false = builder.or(false_val, false_val);
+        let or_false = builder.emit_logi_or(false_val, false_val);
         match or_false {
             Instr::ConstBool(_, val) => assert_eq!(val, false),
             _ => panic!("Expected false || false = false optimization"),
         }
 
         // Test unary operators
-        let neg_result = builder.neg(three);
+        let neg_result = builder.emit_neg(three);
         match neg_result {
             Instr::ConstI32(_, val) => assert_eq!(val, -3),
             _ => panic!("Expected constant folding for negation"),
         }
 
-        let not_result = builder.not(true_val);
+        let not_result = builder.emit_logi_not(true_val);
         match not_result {
             Instr::ConstBool(_, val) => assert_eq!(val, false),
             _ => panic!("Expected constant folding for logical NOT"),

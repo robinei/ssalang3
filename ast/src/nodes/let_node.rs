@@ -1,6 +1,6 @@
 use common::Symbol;
 
-use crate::{AstNode, CompileContext, NodeHandle, NodeType};
+use crate::{AstNode, CompileContext, CompileResult, NodeHandle, NodeType, TypedNodeHandle};
 
 pub struct LetNode {
     pub name: Symbol,
@@ -14,7 +14,18 @@ impl AstNode for LetNode {
     type LengthType = ();
     type ElementType = ();
 
-    fn compile(&self, _context: &mut CompileContext) {
+    #[inline]
+    fn compile(
+        &self,
+        context: &mut CompileContext,
+        _handle: TypedNodeHandle<Self>,
+    ) -> CompileResult {
+        self.compile_let(context)
+    }
+}
+
+impl LetNode {
+    pub fn compile_let(&self, _context: &mut CompileContext) -> CompileResult {
         todo!()
     }
 }

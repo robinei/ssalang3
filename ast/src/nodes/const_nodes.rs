@@ -1,4 +1,9 @@
-use crate::{AstArena, AstNode, CompileContext, NodeType, TypedNodeHandle};
+use ir::Instr;
+
+use crate::{
+    AstArena, AstNode, CompileContext, CompileError, CompileResult, NodeType, TypedNodeHandle,
+    Value,
+};
 
 pub struct ConstUnitNode {}
 
@@ -7,8 +12,12 @@ impl AstNode for ConstUnitNode {
     type LengthType = ();
     type ElementType = ();
 
-    fn compile(&self, _context: &mut CompileContext) {
-        todo!()
+    fn compile(
+        &self,
+        _context: &mut CompileContext,
+        _handle: TypedNodeHandle<Self>,
+    ) -> CompileResult {
+        Ok(Value::unit())
     }
 }
 
@@ -21,8 +30,12 @@ impl AstNode for ConstBoolNode {
     type LengthType = ();
     type ElementType = ();
 
-    fn compile(&self, _context: &mut CompileContext) {
-        todo!()
+    fn compile(
+        &self,
+        _context: &mut CompileContext,
+        _handle: TypedNodeHandle<Self>,
+    ) -> CompileResult {
+        Ok(Value::new(Instr::const_bool(self.value)))
     }
 }
 
@@ -35,8 +48,12 @@ impl AstNode for ConstI32Node {
     type LengthType = ();
     type ElementType = ();
 
-    fn compile(&self, _context: &mut CompileContext) {
-        todo!()
+    fn compile(
+        &self,
+        _context: &mut CompileContext,
+        _handle: TypedNodeHandle<Self>,
+    ) -> CompileResult {
+        Ok(Value::new(Instr::const_i32(self.value)))
     }
 }
 
@@ -47,8 +64,15 @@ impl AstNode for ConstStringNode {
     type LengthType = u32;
     type ElementType = u8;
 
-    fn compile(&self, _context: &mut CompileContext) {
-        todo!()
+    fn compile(
+        &self,
+        context: &mut CompileContext,
+        _handle: TypedNodeHandle<Self>,
+    ) -> CompileResult {
+        Err(CompileError::Error(
+            self.get_untyped_handle(context),
+            "not implemented".to_string(),
+        ))
     }
 }
 

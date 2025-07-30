@@ -1,4 +1,5 @@
 use crate::{ArrayLen, AstNode, NodeType, TypedNodeHandle};
+use std::mem::{align_of, size_of};
 
 // NodeInfo struct that embeds source location and node tag
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,6 +71,7 @@ impl AstArena {
     }
 
     // Private wrapper accessor methods
+    #[inline]
     fn get_node_wrapper<T: AstNode>(&self, handle: TypedNodeHandle<T>) -> &NodeWrapper<T> {
         let byte_offset = handle.byte_offset() as usize;
         assert!(
@@ -91,27 +93,31 @@ impl AstArena {
     }
 
     // Get source location for any handle with validation
+    #[inline]
     pub fn get_source_location<T: AstNode>(&self, handle: TypedNodeHandle<T>) -> u32 {
         self.get_node_wrapper(handle).info.source_location()
     }
 
     // Safe accessor for typed handles - validates node tag
+    #[inline]
     pub fn get<T: AstNode>(&self, handle: TypedNodeHandle<T>) -> &T {
         &self.get_node_wrapper(handle).node
     }
 
     // Helper to get trailing array for typed handles - validates node tag
+    #[inline]
     pub fn get_array<T: AstNode>(&self, handle: TypedNodeHandle<T>) -> &[T::ElementType] {
         let wrapper = self.get_node_wrapper(handle);
         unsafe {
             // Use the zero-sized array to get the perfect array start pointer
             let array_ptr = wrapper.array.as_ptr();
-            let array_len: u32 = wrapper.array_len.get_value();
+            let array_len: u32 = wrapper.array_len.get_len();
             std::slice::from_raw_parts(array_ptr, array_len as usize)
         }
     }
 
     // Generic allocation for simple nodes
+    #[inline]
     pub fn alloc<T: AstNode>(&mut self, node: T, source_location: u32) -> TypedNodeHandle<T> {
         self.alloc_with_array(node, &[], source_location)
     }
@@ -172,5 +178,52 @@ impl AstArena {
         }
 
         TypedNodeHandle::new(byte_offset as u32)
+    }
+
+    // Create handle from node reference - safe but efficient
+    pub fn handle_from_ref<T: AstNode>(&self, node_ref: &T) -> Option<TypedNodeHandle<T>> {
+        let node_ptr = node_ref as *const T;
+        let buffer_start = self.buffer.as_ptr();
+        let buffer_end = unsafe { buffer_start.add(self.buffer.len()) };
+
+        // Check if the reference points within our buffer
+        if (node_ptr as *const u8) < buffer_start || (node_ptr as *const u8) >= buffer_end {
+            return None;
+        }
+
+        // Calculate potential wrapper pointer by backing up from node to wrapper start
+        let wrapper_ptr =
+            unsafe { (node_ptr as *const u8).sub(std::mem::offset_of!(NodeWrapper<T>, node)) }
+                as *const NodeWrapper<T>;
+
+        // Verify wrapper pointer is within bounds and properly aligned
+        if (wrapper_ptr as *const u8) < buffer_start
+            || (wrapper_ptr as *const u8) >= buffer_end
+            || (wrapper_ptr as usize) % std::mem::align_of::<NodeWrapper<T>>() != 0
+        {
+            return None;
+        }
+
+        let byte_offset = unsafe { (wrapper_ptr as *const u8).offset_from(buffer_start) } as u32;
+
+        // Verify 4-byte alignment for handle
+        if byte_offset % 4 != 0 {
+            return None;
+        }
+
+        // Validate the node type matches
+        let wrapper = unsafe { &*wrapper_ptr };
+        if wrapper.info.node_type() != T::NODE_TYPE {
+            return None;
+        }
+
+        // Additional bounds check - ensure entire wrapper + array fits
+        let array_len = wrapper.array_len.get_len() as usize;
+        let total_size = size_of::<NodeWrapper<T>>() + size_of::<T::ElementType>() * array_len;
+        if byte_offset as usize + total_size > self.buffer.len() {
+            return None;
+        }
+
+        Some(TypedNodeHandle::new(byte_offset))
     }
 }

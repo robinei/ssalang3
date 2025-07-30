@@ -1,11 +1,14 @@
 use common::Symbol;
 
-use crate::{AstNode, CompileContext, NodeHandle, NodeType, TypedNodeHandle, nodes::BlockNode};
+use crate::{
+    AstNode, CompileContext, CompileResult, NodeHandle, NodeType, TypedNodeHandle, nodes::BlockNode,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
 pub struct FnParam {
     pub name: Symbol,
+    pub is_static: bool,
     pub type_node: NodeHandle,
 }
 
@@ -20,7 +23,11 @@ impl AstNode for FnNode {
     type LengthType = u32;
     type ElementType = FnParam;
 
-    fn compile(&self, _context: &mut CompileContext) {
+    fn compile(
+        &self,
+        _context: &mut CompileContext,
+        _handle: TypedNodeHandle<Self>,
+    ) -> CompileResult {
         todo!()
     }
 }
