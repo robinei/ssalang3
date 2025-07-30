@@ -7,3 +7,4 @@ edition = "2024"
 common = { path = "../common" }
 lexer = { path = "../lexer" }
 ir = { path = "../ir" }
+smallvec = { version = "1.15.1", features = ["union"] }

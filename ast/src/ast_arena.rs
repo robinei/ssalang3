@@ -1,5 +1,9 @@
-use crate::{ArrayLen, AstNode, NodeType, TypedNodeHandle};
-use std::mem::{align_of, size_of};
+use crate::{ArrayLen, AstNode, CompileContext, CompileError, CompileResult, NodeType, nodes::*};
+use std::{
+    marker::PhantomData,
+    mem::{align_of, size_of},
+    num::NonZeroU32,
+};
 
 // NodeInfo struct that embeds source location and node tag
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -11,10 +15,7 @@ struct NodeInfo {
 
 impl NodeInfo {
     fn new(node_type: NodeType, source_location: u32) -> Self {
-        debug_assert!(
-            source_location < (1 << 24),
-            "Source location too large for 24-bit storage"
-        );
+        debug_assert!(source_location < (1 << 24), "Source location too large for 24-bit storage");
         Self {
             data: (node_type as u32) | (source_location << 8),
         }
@@ -54,6 +55,157 @@ const fn assert_no_drop<T>() {
     let _ = AssertNotDrop::<T>::ASSERT;
 }
 
+// Type-erased handle that encodes both node type and offset
+// Uses niche optimization: node type 0 is reserved as sentinel for None in Option<NodeHandle>
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct NodeHandle {
+    handle: NonZeroU32,
+}
+
+impl std::fmt::Debug for NodeHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NodeHandle")
+            .field("type", &self.node_type())
+            .field("offset", &self.byte_offset())
+            .finish()
+    }
+}
+
+impl NodeHandle {
+    #[inline]
+    pub fn node_type(self) -> NodeType {
+        // Safety: We control construction and NodeType has valid discriminants 1-21
+        unsafe { std::mem::transmute((self.handle.get() & 0xFF) as u8) }
+    }
+
+    #[inline]
+    pub fn byte_offset(self) -> u32 {
+        (self.handle.get() >> 8) * 4
+    }
+
+    // Convert to strongly typed handle if types match
+    #[inline]
+    pub fn typed<T: AstNode>(self) -> Option<TypedNodeHandle<T>> {
+        if self.node_type() == T::NODE_TYPE {
+            Some(TypedNodeHandle::<T> {
+                handle: self.handle,
+                _phantom: PhantomData,
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn comp<T: AstNode>(self, context: &mut CompileContext) -> CompileResult {
+        self.typed::<T>().unwrap().compile(context)
+    }
+
+    pub fn compile(self, context: &mut CompileContext) -> CompileResult {
+        match self.node_type() {
+            NodeType::Assign => self.comp::<AssignNode>(context),
+            NodeType::Binop => self.comp::<BinopNode>(context),
+            NodeType::Block => self.comp::<BlockNode>(context),
+            NodeType::Borrow => self.comp::<BorrowNode>(context),
+            NodeType::Break => self.comp::<BreakNode>(context),
+            NodeType::Call => self.comp::<CallNode>(context),
+            NodeType::ConstUnit => self.comp::<ConstUnitNode>(context),
+            NodeType::ConstBool => self.comp::<ConstBoolNode>(context),
+            NodeType::ConstInt => self.comp::<ConstIntNode>(context),
+            NodeType::ConstUint => self.comp::<ConstUintNode>(context),
+            NodeType::ConstFloat => self.comp::<ConstFloatNode>(context),
+            NodeType::ConstString => self.comp::<ConstStringNode>(context),
+            NodeType::ConstTypeId => self.comp::<ConstTypeIdNode>(context),
+            NodeType::Continue => self.comp::<ContinueNode>(context),
+            NodeType::Fn => self.comp::<FnNode>(context),
+            NodeType::Ident => self.comp::<IdentNode>(context),
+            NodeType::If => self.comp::<IfNode>(context),
+            NodeType::Let => self.comp::<LetNode>(context),
+            NodeType::Module => self.comp::<ModuleNode>(context),
+            NodeType::Return => self.comp::<ReturnNode>(context),
+            NodeType::Struct => self.comp::<StructNode>(context),
+            NodeType::Unop => self.comp::<UnopNode>(context),
+            NodeType::While => self.comp::<WhileNode>(context),
+        }
+    }
+}
+
+impl<T: AstNode> From<TypedNodeHandle<T>> for NodeHandle {
+    #[inline]
+    fn from(typed: TypedNodeHandle<T>) -> Self {
+        typed.untyped()
+    }
+}
+
+// Strongly-typed handle that knows its node type at compile time
+// Uses niche optimization: node type 0 is reserved for None in Option<TypedNodeHandle>
+#[derive(PartialEq, Eq)]
+#[repr(transparent)]
+pub struct TypedNodeHandle<T: AstNode> {
+    handle: NonZeroU32,
+    _phantom: PhantomData<T>,
+}
+
+// manually implement these because the derive macro is confused and refuses to impl them because of the T (which does not have these bounds) in PhantomData
+impl<T: AstNode> Copy for TypedNodeHandle<T> {}
+impl<T: AstNode> Clone for TypedNodeHandle<T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+// Manual Debug implementation to avoid PhantomData noise
+impl<T: AstNode> std::fmt::Debug for TypedNodeHandle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TypedNodeHandle")
+            .field("type", &T::NODE_TYPE)
+            .field("offset", &self.byte_offset())
+            .finish()
+    }
+}
+
+impl<T: AstNode> TypedNodeHandle<T> {
+    #[inline]
+    fn new(byte_offset: u32) -> Self {
+        debug_assert!(byte_offset % 4 == 0, "Byte offset must be 4-byte aligned");
+        let offset_div4 = byte_offset / 4;
+        debug_assert!(offset_div4 < (1 << 24), "Offset too large for 24-bit handle");
+        let handle_bits = (T::NODE_TYPE as u32) | (offset_div4 << 8);
+        debug_assert!(handle_bits != 0, "Handle should never be zero (node type 0 reserved for niche)");
+        Self {
+            handle: NonZeroU32::new(handle_bits).expect("Handle should never be zero"),
+            _phantom: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn node_type(self) -> NodeType {
+        T::NODE_TYPE
+    }
+
+    #[inline]
+    pub fn byte_offset(self) -> u32 {
+        (self.handle.get() >> 8) * 4
+    }
+
+    // Convert to type-erased handle
+    #[inline]
+    pub fn untyped(self) -> NodeHandle {
+        NodeHandle { handle: self.handle }
+    }
+
+    #[inline]
+    pub fn compile(self, context: &mut CompileContext) -> CompileResult {
+        let result = context.module.ast.get(self).compile(context, self)?;
+        if context.static_eval && !result.is_const() {
+            return Err(CompileError::Error(Some(self.untyped()), "expected const value".to_string()));
+        }
+        Ok(result)
+    }
+}
+
 // Arena allocator for AST nodes
 pub struct AstArena {
     buffer: Vec<u8>, // Private - no direct access allowed
@@ -74,10 +226,7 @@ impl AstArena {
     #[inline]
     fn get_node_wrapper<T: AstNode>(&self, handle: TypedNodeHandle<T>) -> &NodeWrapper<T> {
         let byte_offset = handle.byte_offset() as usize;
-        assert!(
-            byte_offset + size_of::<NodeWrapper<T>>() <= self.buffer.len(),
-            "Invalid handle"
-        );
+        assert!(byte_offset + size_of::<NodeWrapper<T>>() <= self.buffer.len(), "Invalid handle");
 
         let wrapper = unsafe { &*(self.buffer.as_ptr().add(byte_offset) as *const NodeWrapper<T>) };
 
@@ -123,20 +272,12 @@ impl AstArena {
     }
 
     // Generic allocation for nodes with trailing arrays
-    pub fn alloc_with_array<T: AstNode>(
-        &mut self,
-        node: T,
-        array: &[T::ElementType],
-        source_location: u32,
-    ) -> TypedNodeHandle<T> {
+    pub fn alloc_with_array<T: AstNode>(&mut self, node: T, array: &[T::ElementType], source_location: u32) -> TypedNodeHandle<T> {
         // Compile-time check that T doesn't implement Drop
         assert_no_drop::<T>();
         assert_no_drop::<T::ElementType>();
 
-        assert!(
-            array.len() <= u32::MAX as usize,
-            "Array too large for u32 length"
-        );
+        assert!(array.len() <= u32::MAX as usize, "Array too large for u32 length");
 
         let wrapper = NodeWrapper {
             node,
@@ -157,10 +298,7 @@ impl AstArena {
         // Check 24-bit handle limit - now 4x larger (64MB - 4)
         // Must ensure the entire allocation fits within addressable range
         const MAX_SIZE: usize = ((1 << 24) - 1) * 4;
-        assert!(
-            byte_offset + total_size <= MAX_SIZE,
-            "Arena size exceeded handle limit (~64MB)"
-        );
+        assert!(byte_offset + total_size <= MAX_SIZE, "Arena size exceeded handle limit (~64MB)");
 
         self.buffer.reserve(total_size);
 
@@ -192,9 +330,7 @@ impl AstArena {
         }
 
         // Calculate potential wrapper pointer by backing up from node to wrapper start
-        let wrapper_ptr =
-            unsafe { (node_ptr as *const u8).sub(std::mem::offset_of!(NodeWrapper<T>, node)) }
-                as *const NodeWrapper<T>;
+        let wrapper_ptr = unsafe { (node_ptr as *const u8).sub(std::mem::offset_of!(NodeWrapper<T>, node)) } as *const NodeWrapper<T>;
 
         // Verify wrapper pointer is within bounds and properly aligned
         if (wrapper_ptr as *const u8) < buffer_start

@@ -45,10 +45,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn skip_whitespace(&mut self) {
-        while self.current_char != '\0'
-            && self.current_char.is_whitespace()
-            && self.current_char != '\n'
-        {
+        while self.current_char != '\0' && self.current_char.is_whitespace() && self.current_char != '\n' {
             self.advance();
         }
     }
@@ -67,9 +64,7 @@ impl<'a> Lexer<'a> {
     fn read_identifier(&mut self) -> u32 {
         let start_pos = self.position;
 
-        while self.current_char != '\0'
-            && (self.current_char.is_alphanumeric() || self.current_char == '_')
-        {
+        while self.current_char != '\0' && (self.current_char.is_alphanumeric() || self.current_char == '_') {
             self.advance();
         }
 
@@ -365,10 +360,7 @@ impl<'a> Lexer<'a> {
             }
 
             ch => {
-                panic!(
-                    "Unexpected character '{}' at position {}",
-                    ch, self.position
-                );
+                panic!("Unexpected character '{}' at position {}", ch, self.position);
             }
         }
     }

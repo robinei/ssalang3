@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::num::NonZeroU32;
-use std::sync::{RwLock, LazyLock};
+use std::sync::{LazyLock, RwLock};
 
 /// A globally unique symbol identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -11,17 +11,17 @@ impl Symbol {
     fn new(id: u32) -> Self {
         Self(NonZeroU32::new(id).unwrap())
     }
-    
+
     /// Get the numeric ID of this symbol
     pub fn id(self) -> u32 {
         self.0.get()
     }
-    
+
     /// Get the string representation of this symbol
     pub fn as_str(self) -> &'static str {
         SYMBOL_INTERNER.with_symbol(self)
     }
-    
+
     /// Intern a string and return its symbol
     pub fn intern(s: &str) -> Symbol {
         SYMBOL_INTERNER.intern(s)
@@ -49,7 +49,7 @@ impl SymbolInterner {
             id_to_string: RwLock::new(vec![""]),
         }
     }
-    
+
     /// Intern a string and return its symbol
     fn intern(&self, s: &str) -> Symbol {
         assert!(s.len() > 0);
@@ -61,36 +61,36 @@ impl SymbolInterner {
                 return symbol;
             }
         }
-        
+
         // Need to create new symbol (write lock)
         let mut string_to_id = self.string_to_id.write().unwrap();
         let mut id_to_string = self.id_to_string.write().unwrap();
-        
+
         // Check again in case another thread added it while we were waiting
         if let Some(&symbol) = string_to_id.get(s) {
             return symbol;
         }
-        
+
         // Create new symbol
         let id = id_to_string.len() as u32;
         let symbol = Symbol::new(id);
-        
+
         // Leak the string to get a 'static reference
         // This is safe because symbols live for the entire program duration
         let static_str: &'static str = Box::leak(s.to_string().into_boxed_str());
-        
+
         string_to_id.insert(s.to_string(), symbol);
         id_to_string.push(static_str);
-        
+
         symbol
     }
-    
+
     /// Get the string for a symbol (assumes symbol is valid)
     fn with_symbol(&self, symbol: Symbol) -> &'static str {
         let id_to_string = self.id_to_string.read().unwrap();
         id_to_string[symbol.0.get() as usize]
     }
-    
+
     /// Get the number of interned symbols
     #[cfg(test)]
     #[allow(dead_code)]
@@ -105,32 +105,32 @@ static SYMBOL_INTERNER: LazyLock<SymbolInterner> = LazyLock::new(|| SymbolIntern
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_symbol_interning() {
         let sym1 = Symbol::intern("test");
         let sym2 = Symbol::intern("test");
         let sym3 = Symbol::intern("different");
-        
+
         // Same string should give same symbol
         assert_eq!(sym1, sym2);
         assert_ne!(sym1, sym3);
-        
+
         // Should be able to get string back
         assert_eq!(sym1.as_str(), "test");
         assert_eq!(sym3.as_str(), "different");
     }
-    
+
     #[test]
     fn test_symbol_ordering() {
         let sym1 = Symbol::intern("aaa");
         let sym2 = Symbol::intern("bbb");
-        
+
         // Symbols should be ordered by creation order
         assert!(sym1 < sym2);
         assert!(sym1.id() < sym2.id());
     }
-    
+
     #[test]
     fn test_symbol_display() {
         let sym = Symbol::intern("hello");
@@ -140,7 +140,7 @@ mod tests {
     #[test]
     fn test_concurrent_interning() {
         use std::thread;
-        
+
         let handles: Vec<_> = (0..10)
             .map(|i| {
                 thread::spawn(move || {
@@ -150,9 +150,9 @@ mod tests {
                 })
             })
             .collect();
-        
+
         let symbols: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
-        
+
         // All symbols should be different
         for i in 0..symbols.len() {
             for j in i + 1..symbols.len() {

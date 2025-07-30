@@ -9,10 +9,6 @@ pub struct Token {
 
 impl Token {
     pub fn new(token_type: TokenType, start: u32, length: u32) -> Self {
-        Self {
-            token_type,
-            start,
-            length,
-        }
+        Self { token_type, start, length }
     }
 }

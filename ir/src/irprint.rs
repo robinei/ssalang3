@@ -134,7 +134,7 @@ impl<'a> IrPrinter<'a> {
 
     fn print_scheduled_instruction(&mut self, instr_ref: InstrRef, instr: &Instr) {
         // Only print instruction label for non-void instructions
-        if instr.get_type_id() != TypeId::unit_id() {
+        if instr.get_type_id() != TypeId::UNIT {
             let instr_label = self.format_instr_ref(instr_ref);
             self.write_colored(Color::Reference, &format!("{}:", instr_label));
             self.buffer.push_str("    ");
@@ -146,7 +146,7 @@ impl<'a> IrPrinter<'a> {
         self.print_instruction_body(instr);
 
         // Only print type comment for non-void
-        if instr.get_type_id() != TypeId::unit_id() {
+        if instr.get_type_id() != TypeId::UNIT {
             self.print_type_comment(instr.get_meta());
         }
 
@@ -156,6 +156,10 @@ impl<'a> IrPrinter<'a> {
     fn print_instruction_body(&mut self, instr: &Instr) {
         match instr {
             Instr::Nop(_) => {
+                let name = self.get_instr_name(instr);
+                self.write_colored(Color::Instruction, name);
+            }
+            Instr::Never(_) => {
                 let name = self.get_instr_name(instr);
                 self.write_colored(Color::Instruction, name);
             }
@@ -207,13 +211,47 @@ impl<'a> IrPrinter<'a> {
                 self.buffer.push_str(self.calculate_spacing(name));
                 self.write_colored(Color::Reference, &self.format_phi_ref(*phi_ref));
             }
+            Instr::ConstUnit(_) => {
+                let name = self.get_instr_name(instr);
+                self.write_colored(Color::Instruction, name);
+            }
             Instr::ConstBool(_, value) => {
                 let name = self.get_instr_name(instr);
                 self.write_colored(Color::Instruction, name);
                 self.buffer.push_str(" ");
                 self.write_colored(Color::Constant, &value.to_string());
             }
-            Instr::ConstI32(_, value) => {
+            Instr::ConstInt(_, value) => {
+                let name = self.get_instr_name(instr);
+                self.write_colored(Color::Instruction, name);
+                self.buffer.push_str("  ");
+                self.write_colored(Color::Constant, &value.to_string());
+            }
+            Instr::ConstUInt(_, value) => {
+                let name = self.get_instr_name(instr);
+                self.write_colored(Color::Instruction, name);
+                self.buffer.push_str("  ");
+                self.write_colored(Color::Constant, &value.to_string());
+            }
+            Instr::ConstFloat(_, value) => {
+                let name = self.get_instr_name(instr);
+                self.write_colored(Color::Instruction, name);
+                self.buffer.push_str("  ");
+                self.write_colored(Color::Constant, &value.to_string());
+            }
+            Instr::ConstTemplate(_, value) => {
+                let name = self.get_instr_name(instr);
+                self.write_colored(Color::Instruction, name);
+                self.buffer.push_str("  ");
+                self.write_colored(Color::Constant, &value.to_string());
+            }
+            Instr::ConstFunction(_, value) => {
+                let name = self.get_instr_name(instr);
+                self.write_colored(Color::Instruction, name);
+                self.buffer.push_str("  ");
+                self.write_colored(Color::Constant, &value.to_string());
+            }
+            Instr::ConstType(_, value) => {
                 let name = self.get_instr_name(instr);
                 self.write_colored(Color::Instruction, name);
                 self.buffer.push_str("  ");
@@ -225,8 +263,14 @@ impl<'a> IrPrinter<'a> {
                 self.buffer.push_str(self.calculate_spacing(name));
                 self.write_colored(Color::Constant, &index.to_string());
             }
+            Instr::Call(_, _func, _args) | Instr::PureCall(_, _func, _args) => {
+                let name = self.get_instr_name(instr);
+                self.write_colored(Color::Instruction, name);
+                // TODO: print call instructions
+            }
             // Binary operators - all follow same pattern
-            Instr::Add(_, left, right)
+            Instr::Cons(_, left, right)
+            | Instr::Add(_, left, right)
             | Instr::Sub(_, left, right)
             | Instr::Mul(_, left, right)
             | Instr::Div(_, left, right)
@@ -242,7 +286,12 @@ impl<'a> IrPrinter<'a> {
                 self.print_binary_instr(name, *left, *right);
             }
             // Unary operators - all follow same pattern
-            Instr::Neg(_, operand) | Instr::Not(_, operand) => {
+            Instr::Neg(_, operand)
+            | Instr::Not(_, operand)
+            | Instr::CheckedCast(_, operand)
+            | Instr::UncheckedCast(_, operand)
+            | Instr::BitCast(_, operand) => {
+                // TODO: properly handle the casts (show target type)
                 let name = self.get_instr_name(instr);
                 self.print_unary_instr(name, *operand);
             }
@@ -267,17 +316,27 @@ impl<'a> IrPrinter<'a> {
     fn get_instr_name(&self, instr: &Instr) -> &'static str {
         match instr {
             Instr::Nop(_) => "nop",
+            Instr::Never(_) => "never",
             Instr::Identity(..) => "identity",
             Instr::Print(..) => "print",
+            Instr::Call(..) => "call",
             Instr::Label(..) => "label",
             Instr::Jump(..) => "jump",
             Instr::Branch(..) => "branch",
             Instr::Ret(..) => "ret",
             Instr::Upsilon(..) => "upsilon",
             Instr::Phi(..) => "phi",
+            Instr::ConstUnit(..) => "const_unit",
             Instr::ConstBool(..) => "const_bool",
-            Instr::ConstI32(..) => "const_i32",
+            Instr::ConstInt(..) => "const_int",
+            Instr::ConstUInt(..) => "const_uint",
+            Instr::ConstFloat(..) => "const_float",
+            Instr::ConstTemplate(..) => "const_generic_fn",
+            Instr::ConstFunction(..) => "const_concrete_fn",
+            Instr::ConstType(..) => "const_type_id",
             Instr::Arg(..) => "arg",
+            Instr::PureCall(..) => "pure_call",
+            Instr::Cons(..) => "cons",
             Instr::Add(..) => "add",
             Instr::Sub(..) => "sub",
             Instr::Mul(..) => "mul",
@@ -292,6 +351,9 @@ impl<'a> IrPrinter<'a> {
             Instr::Or(..) => "or",
             Instr::Neg(..) => "neg",
             Instr::Not(..) => "not",
+            Instr::CheckedCast(..) => "checked_cast",
+            Instr::UncheckedCast(..) => "unchecked_cast",
+            Instr::BitCast(..) => "bit_cast",
             Instr::StackAlloc(..) => "stack_alloc",
             Instr::Load(..) => "load",
             Instr::Store(..) => "store",
@@ -302,8 +364,7 @@ impl<'a> IrPrinter<'a> {
         // Match the exact spacing from original code for compatibility
         match instr_name {
             // Most operators: 8 spaces (total width ~11-12)
-            "add" | "sub" | "mul" | "div" | "neq" | "and" | "neg" | "not" | "ret" | "arg"
-            | "phi" => "        ",
+            "add" | "sub" | "mul" | "div" | "neq" | "and" | "neg" | "not" | "ret" | "arg" | "phi" => "        ",
             // Short operators get 9 spaces
             "eq" | "lt" | "gt" | "or" => "         ",
             // 5-char operators get 6 spaces
@@ -335,7 +396,7 @@ impl<'a> IrPrinter<'a> {
     }
 
     fn print_type_comment(&mut self, meta: Meta) {
-        let type_str = format!("{}", meta.get_type_id().get_type().unwrap());
+        let type_str = format!("{}", meta.get_type_id().get_type());
 
         // Add padding to align comments
         let padding = 20_i32.saturating_sub(self.buffer.len() as i32 % 100); // Rough alignment
@@ -397,7 +458,7 @@ mod tests {
     #[test]
     fn test_constants_only() {
         let mut code = Code::new();
-        code.push_unpinned(Instr::const_i32(42));
+        code.push_unpinned(Instr::const_int(42));
         code.push_unpinned(Instr::const_bool(true));
 
         let printer = IrPrinter::new(&code);
@@ -414,13 +475,10 @@ mod tests {
     #[test]
     fn test_scheduled_instructions() {
         let mut code = Code::new();
-        let const_ref = code.push_unpinned(Instr::const_i32(42));
-        code.push_pinned(Instr::Label(
-            Meta::new(TypeId::unit_id()),
-            BlockRef::new(1).unwrap(),
-        ));
-        code.push_pinned(Instr::Print(Meta::new(TypeId::unit_id()), const_ref));
-        code.push_pinned(Instr::Ret(Meta::new(TypeId::unit_id()), const_ref));
+        let const_ref = code.push_unpinned(Instr::const_int(42));
+        code.push_pinned(Instr::Label(Meta::new(TypeId::UNIT), BlockRef::new(1).unwrap()));
+        code.push_pinned(Instr::Print(Meta::new(TypeId::UNIT), const_ref));
+        code.push_pinned(Instr::Ret(Meta::new(TypeId::UNIT), const_ref));
 
         let printer = IrPrinter::new(&code);
         let output = printer.print();
@@ -439,17 +497,10 @@ mod tests {
     #[test]
     fn test_non_void_instruction_labeling() {
         let mut code = Code::new();
-        let const_ref = code.push_unpinned(Instr::const_i32(42));
-        code.push_pinned(Instr::Label(
-            Meta::new(TypeId::unit_id()),
-            BlockRef::new(1).unwrap(),
-        ));
-        let add_ref = code.push_pinned(Instr::Add(
-            Meta::new(TypeId::i32_id()),
-            const_ref,
-            const_ref,
-        ));
-        code.push_pinned(Instr::Ret(Meta::new(TypeId::unit_id()), add_ref));
+        let const_ref = code.push_unpinned(Instr::const_int(42));
+        code.push_pinned(Instr::Label(Meta::new(TypeId::UNIT), BlockRef::new(1).unwrap()));
+        let add_ref = code.push_pinned(Instr::Add(Meta::new(TypeId::I32), const_ref, const_ref));
+        code.push_pinned(Instr::Ret(Meta::new(TypeId::UNIT), add_ref));
 
         let printer = IrPrinter::new(&code);
         let output = printer.print();
@@ -470,38 +521,27 @@ mod tests {
         let mut code = Code::new();
 
         // Constants
-        let const42 = code.push_unpinned(Instr::const_i32(42));
+        let const42 = code.push_unpinned(Instr::const_int(42));
         let _const_true = code.push_unpinned(Instr::const_bool(true));
-        let const10 = code.push_unpinned(Instr::const_i32(10));
+        let const10 = code.push_unpinned(Instr::const_int(10));
 
         // Function with multiple blocks
-        code.push_pinned(Instr::Label(
-            Meta::new(TypeId::unit_id()),
-            BlockRef::new(1).unwrap(),
-        ));
-        let add_result =
-            code.push_pinned(Instr::Add(Meta::new(TypeId::i32_id()), const42, const10));
-        let eq_result =
-            code.push_pinned(Instr::Eq(Meta::new(TypeId::bool_id()), add_result, const42));
+        code.push_pinned(Instr::Label(Meta::new(TypeId::UNIT), BlockRef::new(1).unwrap()));
+        let add_result = code.push_pinned(Instr::Add(Meta::new(TypeId::I32), const42, const10));
+        let eq_result = code.push_pinned(Instr::Eq(Meta::new(TypeId::BOOL), add_result, const42));
         code.push_pinned(Instr::Branch(
-            Meta::new(TypeId::unit_id()),
+            Meta::new(TypeId::UNIT),
             eq_result,
             BlockRef::new(2).unwrap(),
             BlockRef::new(3).unwrap(),
         ));
 
-        code.push_pinned(Instr::Label(
-            Meta::new(TypeId::unit_id()),
-            BlockRef::new(2).unwrap(),
-        ));
-        code.push_pinned(Instr::Print(Meta::new(TypeId::unit_id()), const42));
-        code.push_pinned(Instr::Ret(Meta::new(TypeId::unit_id()), const42));
+        code.push_pinned(Instr::Label(Meta::new(TypeId::UNIT), BlockRef::new(2).unwrap()));
+        code.push_pinned(Instr::Print(Meta::new(TypeId::UNIT), const42));
+        code.push_pinned(Instr::Ret(Meta::new(TypeId::UNIT), const42));
 
-        code.push_pinned(Instr::Label(
-            Meta::new(TypeId::unit_id()),
-            BlockRef::new(3).unwrap(),
-        ));
-        code.push_pinned(Instr::Ret(Meta::new(TypeId::unit_id()), const10));
+        code.push_pinned(Instr::Label(Meta::new(TypeId::UNIT), BlockRef::new(3).unwrap()));
+        code.push_pinned(Instr::Ret(Meta::new(TypeId::UNIT), const10));
 
         let printer = IrPrinter::new(&code);
         let output = printer.print();
@@ -528,12 +568,9 @@ mod tests {
     #[test]
     fn test_colored_output() {
         let mut code = Code::new();
-        let const_ref = code.push_unpinned(Instr::const_i32(42));
-        code.push_pinned(Instr::Label(
-            Meta::new(TypeId::unit_id()),
-            BlockRef::new(1).unwrap(),
-        ));
-        code.push_pinned(Instr::Ret(Meta::new(TypeId::unit_id()), const_ref));
+        let const_ref = code.push_unpinned(Instr::const_int(42));
+        code.push_pinned(Instr::Label(Meta::new(TypeId::UNIT), BlockRef::new(1).unwrap()));
+        code.push_pinned(Instr::Ret(Meta::new(TypeId::UNIT), const_ref));
 
         let printer = IrPrinter::new_colored(&code);
         let output = printer.print();

@@ -3,42 +3,27 @@
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeType {
-    // Type nodes
-    TypeAtom = 1, // Start at 1, reserve 0 for niche optimization
-
-    // Constant nodes
+    Assign = 1, // Start at 1, reserve 0 for niche optimization
+    Binop,
+    Block,
+    Borrow,
+    Break,
+    Call,
     ConstUnit,
     ConstBool,
-    ConstI32,
+    ConstInt,
+    ConstUint,
+    ConstFloat,
     ConstString,
-
-    // Operator nodes
-    Unop,
-    Binop,
-
-    // Local variable nodes
-    LetFn,
-    Let,
-    Assign,
-    Ident,
-    Borrow,
-
-    // Control flow nodesexpr
-    Block,
-    While,
-    If,
-
-    // Jump nodes
-    Break,
+    ConstTypeId,
     Continue,
-    Return,
-
-    // Function node
     Fn,
-
-    // Struct nodes
-    Struct,
-
-    // Module node
+    Ident,
+    If,
+    Let,
     Module,
+    Return,
+    Struct,
+    Unop,
+    While,
 }

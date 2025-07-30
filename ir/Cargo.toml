@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 common = { path = "../common" }
 insta = "1.43.1"
+ordered-float = "5.0.0"
 smallvec = { version = "1.15.1", features = ["union"] }

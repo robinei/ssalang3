@@ -1,6 +1,6 @@
 use crate::{CompileContext, CompileResult, NodeHandle, TypedNodeHandle, node_type::NodeType};
 
-// Trait that let's us abstract over u32 and () as lengths.
+// Trait that lets us abstract over u32 and () as lengths.
 // () is unit, and zero-sized, and is used for nodes with no attached array
 pub trait ArrayLen: Default + Copy {
     fn create_len(value: u32) -> Self;
@@ -37,12 +37,11 @@ pub trait AstNode: Sized {
     type LengthType: ArrayLen;
     type ElementType;
 
-    fn compile(&self, context: &mut CompileContext, handle: TypedNodeHandle<Self>)
-    -> CompileResult;
+    fn compile(&self, context: &mut CompileContext, handle: TypedNodeHandle<Self>) -> CompileResult;
 
     #[inline]
     fn get_handle(&self, context: &CompileContext) -> Option<TypedNodeHandle<Self>> {
-        context.ast.handle_from_ref(self)
+        context.module.ast.handle_from_ref(self)
     }
 
     #[inline]
